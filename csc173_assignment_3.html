@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>CSC 173: Assignment 3</title>
+
+    <script type="text/javascript" src="https://d3js.org/d3.v4.js"></script>
+
+    <!-- Create the select button -->
+    <select id="selectButton"></select>
+
+    <!-- Create a div where the graph will take place -->
+    <div id="my_visual"></div>
+
+    <!-- Color Scale -->
+    <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+
+    <style type="text/css"> 
+
+      div.tooltip { 
+          position: absolute;     
+          text-align: center;     
+          width: 80px;          
+          height: 42px;         
+          padding: 2px;       
+          font: 12px sans-serif;    
+          background: #aee8eb; 
+          border: 0px;    
+          border-radius: 8px;     
+          pointer-events: none;     
+      } 
+    </style>
+  </head>
+
+  <body>
+    <script>
+        // set the dimensions and margins of the graph
+        var margin = {top: 10, right: 100, bottom: 30, left: 30},
+            width = 700 - margin.left - margin.right,
+            height = 500 - margin.top - margin.bottom;
+
+        // append the svg object to the body of the page
+        var svg = d3.select("#my_visual")
+          .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+          .append("g")
+            .attr("transform",
+                  "translate(" + margin.left + "," + margin.top + ")");
+
+        // Set x-label
+        svg.append("text")
+           .attr("class", "x label")
+           .attr("text-anchor", "end")
+           .attr("x", width )
+           .attr("y", height - 5)
+           .style("font-size", "18px")
+           .text("Generation");
+
+        // Set y-label
+        svg.append("text")
+           .attr("class", "y label")
+           .attr("text-anchor", "end")
+           .attr("y", 6)
+           .attr("dy", ".75em")
+           .attr("transform", "rotate(-90)")
+           .style("font-size", "18px")
+           .text("Count");
+
+        svg.append("text")
+           .attr("x", (width / 2))             
+           .attr("y", 10)
+           .attr("text-anchor", "middle")  
+           .style("font-size", "20px") 
+           .style("text-decoration", "underline")  
+           .text("Count of Pokémon Type by Generation");
+
+        // Define the div for the tooltip
+        var div = d3.select("body").append("div")
+            .attr("class", "tooltip")       
+            .style("opacity", 0);   
+
+        //Read the data
+        d3.csv("pokemon-types-1.csv", function(data) {  
+      
+            var allTypes = ["Normal", "Fighting", "Water", "Poison", "Grass", "Electric", "Rock", "Steel", "Ice",
+                            "Fire", "Flying", "Fairy", "Bug", "Psychic", "Ground", "Dark", "Dragon", "Ghost"]
+
+            // add the options to the button
+            d3.select("#selectButton")
+              .selectAll('pokemonTypes')
+              .data(allTypes)
+              .enter()
+              .append('option')
+              .text(function (d) { return d; }) // text showed in the menu
+              .attr("value", function (d) { return d; }) // corresponding value returned by the button
+
+            // A color scale: one color for each type
+            var myColor = d3.scaleOrdinal()
+              .domain(allTypes)
+              .range(d3.schemeSet2);
+
+            // Add X axis
+            var x = d3.scaleLinear()
+              .domain([0,8])
+              .range([ 0, width ]);
+            svg.append("g")
+              .attr("transform", "translate(0," + height + ")")
+              .call(d3.axisBottom(x));
+
+            // Add Y axis
+            var y = d3.scaleLinear()
+              .domain( [0,40])
+              .range([ height, 0 ]);
+            svg.append("g")
+              .call(d3.axisLeft(y));
+
+            // Initialize line with Normal type
+            var line = svg
+              .append('g')
+              .append("path")
+                .datum(data)
+                .attr("d", d3.line()
+                  .x(function(d) { return x(+d.Generation) })
+                  .y(function(d) { return y(+d.Normal) })
+                )
+                .attr("stroke", function(d){ return myColor("Normal") })
+                .style("stroke-width", 5)
+                .style("fill", "none")
+
+            // need to map data
+            var dataFilter = data.map(function(d){return {Generation: d.Generation, value:d[d3.select("#selectButton").property("value")]} })
+
+            var dots = svg.selectAll("dot")  
+                .data(dataFilter)     
+                .enter().append("circle")               
+                .attr("r", 5)
+                .attr("cx", function(d) { return x(d.Generation); })     
+                .attr("cy", function(d) { return y(d.value); })
+            .on("mouseover", function(d) {    
+                    div.transition()    
+                        .duration(200)    
+                        .style("opacity", .9);    
+                    div.html( "Type: "+ d3.select("#selectButton").property("value") + "<br/>Gen: " + d.Generation + "<br/>Count: " + d.value)  
+                        .style("left", (d3.event.pageX) + "px")   
+                        .style("top", (d3.event.pageY - 28) + "px");  
+            })          
+            .on("mouseout", function(d) {   
+                    div.transition()    
+                        .duration(500)    
+                        .style("opacity", 0); 
+            });
+
+            // A function that update the chart
+            function update(selectedGroup) {
+
+              // Create new data with the selection(?)
+              dataFilter = data.map(function(d){return {Generation: d.Generation, value:d[selectedGroup]} })
+
+              // Give new data to update line
+              line
+                  .datum(dataFilter)
+                  .transition()
+                  .duration(1000)
+                  .attr("d", d3.line()
+                    .x(function(d) { return x(+d.Generation) })
+                    .y(function(d) { return y(+d.value) })
+                  )
+                  .attr("stroke", function(d){ return myColor(selectedGroup) })
+
+              dots
+                .data(dataFilter)     
+                .transition()
+                .duration(1000)              
+                .attr("r", 5) 
+                .attr("cx", function(d) { return x(d.Generation); })     
+                .attr("cy", function(d) { return y(d.value); })
+            }
+
+            // When the button is changed, run the update function
+            d3.select("#selectButton").on("change", function(d) {
+                // recover the option that has been chosen
+                var selectedOption = d3.select(this).property("value")
+                // run the updateChart function with this selected option
+                update(selectedOption)
+            })
+        })
+    </script>
+
+    <br/>
+
+    <h3>Overview</h3>
+
+    <p>
+      The visualization displays the count of a particular Pokémon type for each generation. The visualization incorporates interactive features that allow the viewer to gain additional and accurate information. The viewer can use the drop-down list to change the Pokémon type that is being displayed. The visualization also incorporates a tooltip that allows the viewer to see information about a given datapoint without having to rely too much on the axes.
+    </p>
+
+    <h3>Design Decisions</h3>
+
+    <p>
+      A line chart was selected for the visualization because it showcases how the count of each Pokémon type changed as the generations progressed. We considered using a bar chart but felt that the line chart better captured the change in count for a Pokémon type between generations. Additionally, the chart is color coded with each type having a different color. This color coding is primarily used to allow the viewer to more easily distinguish the various Pokémon types. We chose the drop-down list and tooltip as interactions because they are easy for the user to utilize, provide quick and accurate information, and don't create much clutter on the visualization.
+    </p>
+
+    <h3>Development Process</h3>
+
+    <p>
+      We had several different ideas for the visualization. Our first few attempts to create a visualization didn’t go well, so we had to start over several times. This is mostly because we didn’t have much experience with d3, and we found most of our initial ideas were too complicated given our limited knowledge. For example, we considered creating a spider chart that would compare the stats of two Pokémon, but we found that the dataset was too difficult to manipulate for the purpose of the visualization. Eventually, we settled on a simpler visualization that still had potential for viewer interaction, which is the line chart that we ended up creating. We both put in many hours into the project. It’s difficult to say how many hours we worked on the project specifically, but we ultimately worked on it everyday for about two and a half weeks. Again, a lot of this time was spent just trying to get a better understanding of d3. So, the aspect that took the most time was looking through tutorials and learning about d3.
+    </p>
+
+  </body>
+</html>
